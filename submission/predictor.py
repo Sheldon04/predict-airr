@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
+import torch
 from submission.utils import load_data_generator, load_full_dataset, get_repertoire_ids, \
     generate_random_top_sequences_df
 
@@ -22,10 +23,24 @@ class ImmuneStatePredictor:
             device (str): The device to use for computation (e.g., 'cpu', 'cuda').
             **kwargs: Additional hyperparameters for the model.
         """
-        self.n_jobs = n_jobs
+        total_cores = os.cpu_count()
+        if n_jobs == -1:
+            self.n_jobs = total_cores
+        else:
+            self.n_jobs = min(n_jobs, total_cores)
         self.device = device
+        if device == 'cuda' and not torch.cuda.is_available():
+            print("Warning: 'cuda' was requested but is not available. Falling back to 'cpu'.")
+            self.device = 'cpu'
+        else:
+            self.device = device
         # --- your code starts here ---
         # Example: Store hyperparameters, the actual model, identified important sequences, etc.
+
+        # NOTE: we encourage you to use self.n_jobs and self.device if appropriate in
+        # your implementation instead of hardcoding these values because your code may later be run in an
+        # environment with different hardware resources.
+
         self.model = None
         self.important_sequences_ = None
         # --- your code ends here ---
