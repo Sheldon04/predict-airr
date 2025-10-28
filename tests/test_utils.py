@@ -1,7 +1,8 @@
 import os
 import tempfile
 import pytest
-from submission.utils import validate_dirs_and_files
+import pandas as pd
+from submission.utils import validate_dirs_and_files, concatenate_output_files
 
 
 def create_dir_with_tsv_and_metadata(dir_path, n_tsv=1):
@@ -119,3 +120,75 @@ def test_validate_dirs_and_files_multiple_test_dirs():
         create_dir_with_tsv(test_dir2)
         validate_dirs_and_files(train_dir, [test_dir1, test_dir2], out_dir)
         assert os.path.isdir(out_dir)
+
+
+def test_concatenate_output_files():
+    """
+    Test that concatenate_output_files correctly finds, concatenates,
+    and saves test predictions and important sequences files to submissions.csv.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        out_dir = os.path.join(tmp, "output")
+        os.makedirs(out_dir, exist_ok=True)
+
+        pred_df1 = pd.DataFrame({
+            'ID': ['rep1', 'rep2'],
+            'dataset': ['test1', 'test1'],
+            'label_positive_probability': [0.8, 0.6],
+            'junction_aa': [-999.0, -999.0],
+            'v_call': [-999.0, -999.0],
+            'j_call': [-999.0, -999.0]
+        })
+        pred_df1.to_csv(os.path.join(out_dir, 'train1_test_predictions.tsv'), sep='\t', index=False)
+
+        pred_df2 = pd.DataFrame({
+            'ID': ['rep3', 'rep4'],
+            'dataset': ['test2', 'test2'],
+            'label_positive_probability': [0.7, 0.9],
+            'junction_aa': [-999.0, -999.0],
+            'v_call': [-999.0, -999.0],
+            'j_call': [-999.0, -999.0]
+        })
+        pred_df2.to_csv(os.path.join(out_dir, 'train2_test_predictions.tsv'), sep='\t', index=False)
+
+        seq_df1 = pd.DataFrame({
+            'ID': ['train1_seq_top_1', 'train1_seq_top_2'],
+            'dataset': ['train1', 'train1'],
+            'label_positive_probability': [-999.0, -999.0],
+            'junction_aa': ['CASSLEETQYF', 'CASSLDPNQPQHF'],
+            'v_call': ['TRBV20-1', 'TRBV20-1'],
+            'j_call': ['TRBJ2-7', 'TRBJ2-7']
+        })
+        seq_df1.to_csv(os.path.join(out_dir, 'train1_important_sequences.tsv'), sep='\t', index=False)
+
+        concatenate_output_files(out_dir)
+
+        submissions_path = os.path.join(out_dir, 'submissions.csv')
+        assert os.path.exists(submissions_path), "submissions.csv was not created"
+
+        result_df = pd.read_csv(submissions_path)
+        assert len(result_df) == 6, f"Expected 6 rows but got {len(result_df)}"
+
+        expected_cols = ['ID', 'dataset', 'label_positive_probability', 'junction_aa', 'v_call', 'j_call']
+        assert list(result_df.columns) == expected_cols
+
+
+def test_concatenate_output_files_empty_dir():
+    """
+    Test concatenate_output_files creates an empty submissions.csv with correct columns
+    when no files are found.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        out_dir = os.path.join(tmp, "empty_output")
+        os.makedirs(out_dir, exist_ok=True)
+
+        concatenate_output_files(out_dir)
+
+        submissions_path = os.path.join(out_dir, 'submissions.csv')
+        assert os.path.exists(submissions_path), "submissions.csv was not created"
+
+        result_df = pd.read_csv(submissions_path)
+        assert len(result_df) == 0
+        expected_cols = ['ID', 'dataset', 'label_positive_probability', 'junction_aa', 'v_call', 'j_call']
+        assert list(result_df.columns) == expected_cols
+

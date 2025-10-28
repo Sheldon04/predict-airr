@@ -119,6 +119,7 @@ def get_repertoire_ids(data_dir: str) -> list:
 
     return repertoire_ids
 
+
 def generate_random_top_sequences_df(n_seq: int = 50000) -> pd.DataFrame:
     """
     Generates a random DataFrame simulating top important sequences.
@@ -141,6 +142,7 @@ def generate_random_top_sequences_df(n_seq: int = 50000) -> pd.DataFrame:
     }
     return pd.DataFrame(data)
 
+
 def validate_dirs_and_files(train_dir: str, test_dirs: List[str], out_dir: str) -> None:
     assert os.path.isdir(train_dir), f"Train directory `{train_dir}` does not exist."
     train_tsvs = glob.glob(os.path.join(train_dir, "*.tsv"))
@@ -162,3 +164,55 @@ def validate_dirs_and_files(train_dir: str, test_dirs: List[str], out_dir: str) 
     except Exception as e:
         print(f"Failed to create or write to output directory `{out_dir}`: {e}")
         sys.exit(1)
+
+
+def concatenate_output_files(out_dir: str) -> None:
+    """
+    Concatenates all test predictions and important sequences TSV files from the output directory.
+
+    This function finds all files matching the patterns:
+    - *_test_predictions.tsv
+    - *_important_sequences.tsv
+
+    and concatenates them to match the expected output format of submissions.csv.
+
+    Args:
+        out_dir (str): Path to the output directory containing the TSV files.
+
+    Returns:
+        pd.DataFrame: Concatenated DataFrame with predictions followed by important sequences.
+                     Columns: ['ID', 'dataset', 'label_positive_probability', 'junction_aa', 'v_call', 'j_call']
+    """
+    predictions_pattern = os.path.join(out_dir, '*_test_predictions.tsv')
+    sequences_pattern = os.path.join(out_dir, '*_important_sequences.tsv')
+
+    predictions_files = sorted(glob.glob(predictions_pattern))
+    sequences_files = sorted(glob.glob(sequences_pattern))
+
+    df_list = []
+
+    for pred_file in predictions_files:
+        try:
+            df = pd.read_csv(pred_file, sep='\t')
+            df_list.append(df)
+        except Exception as e:
+            print(f"Warning: Could not read predictions file '{pred_file}'. Error: {e}. Skipping.")
+            continue
+
+    for seq_file in sequences_files:
+        try:
+            df = pd.read_csv(seq_file, sep='\t')
+            df_list.append(df)
+        except Exception as e:
+            print(f"Warning: Could not read sequences file '{seq_file}'. Error: {e}. Skipping.")
+            continue
+
+    if not df_list:
+        print("Warning: No output files were found to concatenate.")
+        concatenated_df = pd.DataFrame(
+            columns=['ID', 'dataset', 'label_positive_probability', 'junction_aa', 'v_call', 'j_call'])
+    else:
+        concatenated_df = pd.concat(df_list, ignore_index=True)
+    submissions_file = os.path.join(out_dir, 'submissions.csv')
+    concatenated_df.to_csv(submissions_file, index=False)
+    print(f"Concatenated output written to `{submissions_file}`.")
