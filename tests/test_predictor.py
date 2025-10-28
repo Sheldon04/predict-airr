@@ -95,11 +95,11 @@ def test_identify_associated_sequences_returns_correct_format(test_environment):
 
     assert isinstance(top_seq_df, pd.DataFrame)
 
-    expected_cols = ['ID', 'dataset', 'junction_aa', 'v_call', 'j_call']
+    expected_cols = ['ID', 'dataset', 'label_positive_probability', 'junction_aa', 'v_call', 'j_call']
     assert list(top_seq_df.columns) == expected_cols
 
     assert len(top_seq_df) == top_k, f"Should return {top_k} sequences."
 
     assert (top_seq_df['dataset'] == dataset_name).all()
 
-
+    assert (top_seq_df['label_positive_probability'] == -999.0).all(), "All label_positive_probability values should be -999.0"

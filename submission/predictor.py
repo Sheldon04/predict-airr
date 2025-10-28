@@ -121,7 +121,7 @@ class ImmuneStatePredictor:
             top_k (int): The number of top sequences to return (based on some scoring mechanism).
 
         Returns:
-            pd.DataFrame: A DataFrame with 'ID', 'dataset', junction_aa, v_call, j_call columns.
+            pd.DataFrame: A DataFrame with 'ID', 'dataset', 'label_positive_probability', 'junction_aa', 'v_call', 'j_call' columns.
         """
 
         # --- your code starts here ---
@@ -134,7 +134,8 @@ class ImmuneStatePredictor:
         top_sequences_df['dataset'] = dataset_name
         top_sequences_df['ID'] = range(1, len(top_sequences_df)+1)
         top_sequences_df['ID'] = top_sequences_df['dataset'] + '_seq_top_' + top_sequences_df['ID'].astype(str)
-        top_sequences_df = top_sequences_df[['ID', 'dataset', 'junction_aa', 'v_call', 'j_call']]
+        top_sequences_df['label_positive_probability'] = -999.0 # to enable compatibility with the expected output format
+        top_sequences_df = top_sequences_df[['ID', 'dataset', 'label_positive_probability', 'junction_aa', 'v_call', 'j_call']]
 
         # --- your code ends here ---
         return top_sequences_df
