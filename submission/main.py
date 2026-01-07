@@ -5,6 +5,7 @@ from typing import List
 from submission.predictor import ImmuneStatePredictor
 from submission.predictor_multikmer import ImmuneStatePredictor as MultikmerImmuneStatePredictor
 from submission.predictor_kmer import ImmuneStatePredictor as KmerImmuneStatePredictor
+from submission.predictor_emerson import ImmuneStatePredictor as EmersonImmuneStatePredictor, build_compairr_input
 from submission.utils import save_tsv, validate_dirs_and_files
 
 
@@ -41,6 +42,7 @@ def _save_predictions(predictions: pd.DataFrame, out_dir: str, train_dir: str) -
 
 def _save_important_sequences(predictor: ImmuneStatePredictor, out_dir: str, train_dir: str) -> None:
     """Saves important sequences to a TSV file."""
+    predictor.important_sequences_ = predictor.identify_associated_sequences(train_dir_path=train_dir, top_k=50000)
     seqs = predictor.important_sequences_
     if seqs is None or seqs.empty:
         raise ValueError("No important sequences available to save")
@@ -62,7 +64,8 @@ def main(train_dir: str, test_dirs: List[str], out_dir: str, n_jobs: int, device
 def main_multikmer(train_dir: str, test_dirs: List[str], out_dir: str, n_jobs: int, device: str) -> None:
     validate_dirs_and_files(train_dir, test_dirs, out_dir)
     predictor = MultikmerImmuneStatePredictor(n_jobs=n_jobs,
-                                     device=device)  # instantiate with any other parameters as defined by you in the class
+                                              device=device,
+                                             log_dir='./logs')  
     _train_predictor(predictor, train_dir)
     predictions = _generate_predictions(predictor, test_dirs)
     _save_predictions(predictions, out_dir, train_dir)
@@ -71,7 +74,28 @@ def main_multikmer(train_dir: str, test_dirs: List[str], out_dir: str, n_jobs: i
 def main_kmer(train_dir: str, test_dirs: List[str], out_dir: str, n_jobs: int, device: str) -> None:
     validate_dirs_and_files(train_dir, test_dirs, out_dir)
     predictor = KmerImmuneStatePredictor(n_jobs=n_jobs,
-                                     device=device)  # instantiate with any other parameters as defined by you in the class
+                                         device=device,
+                                         log_dir='./logs')  
+    _train_predictor(predictor, train_dir)
+    predictions = _generate_predictions(predictor, test_dirs)
+    _save_predictions(predictions, out_dir, train_dir)
+    _save_important_sequences(predictor, out_dir, train_dir)
+
+def main_emerson(train_dir: str, test_dirs: List[str], out_dir: str, n_jobs: int, device: str) -> None:
+    validate_dirs_and_files(train_dir, test_dirs, out_dir)
+    
+    # build_compairr_input(train_dir, test_dirs, os.path.join(out_dir, "compairr_inputs"))
+
+    predictor = EmersonImmuneStatePredictor(
+                    n_jobs=n_jobs,
+                    device=device,
+                    log_dir='./logs',
+                    mode='dev',
+                    p_value_threshold=0.0001,
+                    use_compairr=True, 
+                    compairr_dir=os.path.join(out_dir, "compairr_inputs")
+                )
+    
     _train_predictor(predictor, train_dir)
     predictions = _generate_predictions(predictor, test_dirs)
     _save_predictions(predictions, out_dir, train_dir)
@@ -92,4 +116,17 @@ def run():
 
 
 if __name__ == "__main__":
-    run()
+    # run()
+    # main_emerson("/mnt/sda/Kaggle/AIRR-ML/train_datasets/train_datasets/train_dataset_1", 
+    #              ["/mnt/sda/Kaggle/AIRR-ML/test_datasets/test_datasets/test_dataset_1"], 
+    #              "./results", 16, 'cpu')
+    
+    # main_kmer("/mnt/sda/Kaggle/AIRR-ML/train_datasets/train_datasets/train_dataset_2", 
+    #             ["/mnt/sda/Kaggle/AIRR-ML/test_datasets/test_datasets/test_dataset_2"], 
+    #             "./results", 16, 'cpu')
+    
+    main_multikmer("/mnt/sda/Kaggle/AIRR-ML/train_datasets/train_datasets/train_dataset_8", 
+                ["/mnt/sda/Kaggle/AIRR-ML/test_datasets/test_datasets/test_dataset_8_1",
+                 "/mnt/sda/Kaggle/AIRR-ML/test_datasets/test_datasets/test_dataset_8_2", 
+                 "/mnt/sda/Kaggle/AIRR-ML/test_datasets/test_datasets/test_dataset_8_3", ], 
+                "./results", 16, 'cpu')

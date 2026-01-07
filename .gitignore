@@ -1,0 +1,7 @@
+__pycache__/
+**/__pycache__/
+debug/
+results/
+logs/
+cache_kmer/
+cache_multikmer/
