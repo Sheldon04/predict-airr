@@ -3,6 +3,8 @@ import argparse
 import pandas as pd
 from typing import List
 from submission.predictor import ImmuneStatePredictor
+from submission.predictor_multikmer import ImmuneStatePredictor as MultikmerImmuneStatePredictor
+from submission.predictor_kmer import ImmuneStatePredictor as KmerImmuneStatePredictor
 from submission.utils import save_tsv, validate_dirs_and_files
 
 
@@ -51,6 +53,24 @@ def _save_important_sequences(predictor: ImmuneStatePredictor, out_dir: str, tra
 def main(train_dir: str, test_dirs: List[str], out_dir: str, n_jobs: int, device: str) -> None:
     validate_dirs_and_files(train_dir, test_dirs, out_dir)
     predictor = ImmuneStatePredictor(n_jobs=n_jobs,
+                                     device=device)  # instantiate with any other parameters as defined by you in the class
+    _train_predictor(predictor, train_dir)
+    predictions = _generate_predictions(predictor, test_dirs)
+    _save_predictions(predictions, out_dir, train_dir)
+    _save_important_sequences(predictor, out_dir, train_dir)
+
+def main_multikmer(train_dir: str, test_dirs: List[str], out_dir: str, n_jobs: int, device: str) -> None:
+    validate_dirs_and_files(train_dir, test_dirs, out_dir)
+    predictor = MultikmerImmuneStatePredictor(n_jobs=n_jobs,
+                                     device=device)  # instantiate with any other parameters as defined by you in the class
+    _train_predictor(predictor, train_dir)
+    predictions = _generate_predictions(predictor, test_dirs)
+    _save_predictions(predictions, out_dir, train_dir)
+    _save_important_sequences(predictor, out_dir, train_dir)
+
+def main_kmer(train_dir: str, test_dirs: List[str], out_dir: str, n_jobs: int, device: str) -> None:
+    validate_dirs_and_files(train_dir, test_dirs, out_dir)
+    predictor = KmerImmuneStatePredictor(n_jobs=n_jobs,
                                      device=device)  # instantiate with any other parameters as defined by you in the class
     _train_predictor(predictor, train_dir)
     predictions = _generate_predictions(predictor, test_dirs)
