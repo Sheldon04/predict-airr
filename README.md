@@ -36,7 +36,7 @@ OR you want to use our method in new datasets, please use:
 python3 -m submission.main --train_dir /path/to/train_dir --test_dir /path/to/test_dir --predictor kmer
 
 # use multi-kmer
-python3 -m submission.main --train_dir /path/to/train_dir --test_dir /path/to/test_dir --predictor kmer
+python3 -m submission.main --train_dir /path/to/train_dir --test_dir /path/to/test_dir --predictor multikmer
 
 # use emerson with compairr
 python3 -m submission.main --train_dir /path/to/train_dir --test_dir /path/to/test_dir --predictor emerson
