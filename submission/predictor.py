@@ -1,7 +1,6 @@
 import os
 import numpy as np
 import pandas as pd
-import torch
 from submission.utils import load_data_generator, load_full_dataset, get_repertoire_ids, \
     generate_random_top_sequences_df
 
@@ -29,7 +28,7 @@ class ImmuneStatePredictor:
         else:
             self.n_jobs = min(n_jobs, total_cores)
         self.device = device
-        if device == 'cuda' and not torch.cuda.is_available():
+        if device == 'cuda':
             print("Warning: 'cuda' was requested but is not available. Falling back to 'cpu'.")
             self.device = 'cpu'
         else:

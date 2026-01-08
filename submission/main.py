@@ -106,17 +106,38 @@ def run():
     parser = argparse.ArgumentParser(description="Immune State Predictor CLI")
     parser.add_argument("--train_dir", required=True, help="Path to training data directory")
     parser.add_argument("--test_dirs", required=True, nargs="+", help="Path(s) to test data director(ies)")
-    parser.add_argument("--out_dir", required=True, help="Path to output directory")
-    parser.add_argument("--n_jobs", type=int, default=1,
+    parser.add_argument("--out_dir", type=str, default="./results", help="Path to output directory")
+    parser.add_argument("--predictor", type=str, default="reproduce", help="Predictor used: emerson, kmer or multikmer (default: reproduce best predictor based on dataset)")
+    parser.add_argument("--n_jobs", type=int, default=8,
                         help="Number of CPU cores to use. Use -1 for all available cores.")
     parser.add_argument("--device", type=str, default='cpu', choices=['cpu', 'cuda'],
                         help="Device to use for computation ('cpu' or 'cuda').")
     args = parser.parse_args()
-    main(args.train_dir, args.test_dirs, args.out_dir, args.n_jobs, args.device)
+
+    dataset_name = os.path.basename(os.path.abspath(args.rstrip(os.sep)))
+    # if args.predictor == "reproduce", this function will choose the best predictor according to the dataset_name in phase1
+    if args.predictor == "reproduce":
+        if dataset_name in ["train_dataset_1", "train_dataset_3", "train_dataset_6"]:
+            args.predictor = "emerson"
+        elif dataset_name in ["train_dataset_2", "train_dataset_4", "train_dataset_5", "train_dataset_7"]:
+            args.predictor = "kmer"
+        elif dataset_name in ["train_dataset_8"]:
+            args.predictor = "multikmer"
+        else:
+            raise ValueError(f"Unknown dataset name: {dataset_name}. Cannot determine predictor type.")
+    
+    if args.predictor == "emerson":
+        main_emerson(args.train_dir, args.test_dirs, args.out_dir, args.n_jobs, args.device)
+    elif args.predictor == "kmer":
+        main_kmer(args.train_dir, args.test_dirs, args.out_dir, args.n_jobs, args.device)
+    elif args.predictor == "multikmer":
+        main_multikmer(args.train_dir, args.test_dirs, args.out_dir, args.n_jobs, args.device)
+    else:
+        raise ValueError(f"Unknown predictor type: {args.predictor}. Choose from 'emerson', 'kmer', or 'multikmer'.")
 
 
 if __name__ == "__main__":
-    # run()
+    run()
     # main_emerson("/mnt/sda/Kaggle/AIRR-ML/train_datasets/train_datasets/train_dataset_1", 
     #              ["/mnt/sda/Kaggle/AIRR-ML/test_datasets/test_datasets/test_dataset_1"], 
     #              "./results", 16, 'cpu')
@@ -125,8 +146,8 @@ if __name__ == "__main__":
     #             ["/mnt/sda/Kaggle/AIRR-ML/test_datasets/test_datasets/test_dataset_2"], 
     #             "./results", 16, 'cpu')
     
-    main_multikmer("/mnt/sda/Kaggle/AIRR-ML/train_datasets/train_datasets/train_dataset_8", 
-                ["/mnt/sda/Kaggle/AIRR-ML/test_datasets/test_datasets/test_dataset_8_1",
-                 "/mnt/sda/Kaggle/AIRR-ML/test_datasets/test_datasets/test_dataset_8_2", 
-                 "/mnt/sda/Kaggle/AIRR-ML/test_datasets/test_datasets/test_dataset_8_3", ], 
-                "./results", 16, 'cpu')
+    # main_multikmer("/mnt/sda/Kaggle/AIRR-ML/train_datasets/train_datasets/train_dataset_8", 
+    #             ["/mnt/sda/Kaggle/AIRR-ML/test_datasets/test_datasets/test_dataset_8_1",
+    #              "/mnt/sda/Kaggle/AIRR-ML/test_datasets/test_datasets/test_dataset_8_2", 
+    #              "/mnt/sda/Kaggle/AIRR-ML/test_datasets/test_datasets/test_dataset_8_3", ], 
+    #             "./results", 16, 'cpu')

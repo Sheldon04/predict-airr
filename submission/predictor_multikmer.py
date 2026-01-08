@@ -885,8 +885,6 @@ class KmerClassifier:
 
     def tune_and_fit(self, X, y, val_size=0.2):
         """Perform CV tuning on train split and fit, with optional validation split."""
-        # import pdb
-        # pdb.set_trace()
         if isinstance(X, pd.DataFrame):
             self.feature_names_ = X.columns.tolist()
             X = X.values
@@ -1176,9 +1174,6 @@ class ImmuneStatePredictor:
                                     len_bins=((8, 11), (12, 14), (15, 18), (19, 30))
                                 )
         
-        import pdb
-        pdb.set_trace()
-
 
         X_train, y_train, train_ids = prepare_data(X_train_df, y_train_df,
                                                    id_col='ID', label_col='label_positive')
