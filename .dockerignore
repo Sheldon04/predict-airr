@@ -5,4 +5,12 @@ results/
 logs/
 cache_kmer/
 cache_multikmer/
-kaggle-ml-env.tar
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+.env
+.git/
+.gitignore

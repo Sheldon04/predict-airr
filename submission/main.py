@@ -84,7 +84,7 @@ def main_kmer(train_dir: str, test_dirs: List[str], out_dir: str, n_jobs: int, d
 def main_emerson(train_dir: str, test_dirs: List[str], out_dir: str, n_jobs: int, device: str) -> None:
     validate_dirs_and_files(train_dir, test_dirs, out_dir)
     
-    # build_compairr_input(train_dir, test_dirs, os.path.join(out_dir, "compairr_inputs"))
+    build_compairr_input(train_dir, test_dirs, os.path.join(out_dir, "compairr_inputs"))
 
     predictor = EmersonImmuneStatePredictor(
                     n_jobs=n_jobs,
@@ -114,7 +114,7 @@ def run():
                         help="Device to use for computation ('cpu' or 'cuda').")
     args = parser.parse_args()
 
-    dataset_name = os.path.basename(os.path.abspath(args.rstrip(os.sep)))
+    dataset_name = os.path.basename(os.path.abspath(args.train_dir.rstrip(os.sep)))
     # if args.predictor == "reproduce", this function will choose the best predictor according to the dataset_name in phase1
     if args.predictor == "reproduce":
         if dataset_name in ["train_dataset_1", "train_dataset_3", "train_dataset_6"]:
