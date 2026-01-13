@@ -745,7 +745,22 @@ class ImmuneStatePredictor:
         self.cache_dir = cache_dir
 
         # 超参数
-        self.p_value_threshold = p_value_threshold
+        if isinstance(p_value_threshold, (float, int, np.floating, np.integer)):
+            self.p_value_thresholds = [float(p_value_threshold)]
+        else:
+            self.p_value_thresholds = [float(x) for x in p_value_threshold]
+
+        if len(self.p_value_thresholds) == 0:
+            raise ValueError("p_value_threshold cannot be empty.")
+
+        # 记录每个阈值对应的结果（可选但你要求要“保存每个p_value对应的disease_set, disease_df”）
+        self.disease_sequence_sets_by_p_ = {}   # {p: set((junction_aa, v_call, j_call))}
+        self.disease_sequences_dfs_by_p_ = {}   # {p: DataFrame}
+        self.val_scores_by_p_ = {}              # {p: {'roc_auc':..., 'balanced_accuracy':...}}
+
+        # 记录最终选中的最优阈值
+        self.best_p_value_threshold_ = None
+
         self.val_size = val_size
         self.random_state = random_state
 
@@ -902,64 +917,105 @@ class ImmuneStatePredictor:
             )
 
 
-        # --------- 用 train 子集找 label-associated clonotypes ---------
-        disease_set, disease_df = _find_disease_associated_clonotypes(
-            train_clonotypes,
-            train_labels,
-            p_value_threshold=self.p_value_threshold
-        )
+        # --------- 遍历多个 p-value 阈值：找 disease clonotypes -> 拟合 -> val 评估 ---------
+        has_val = (len(val_ids) > 0)
 
-        print(f"[Emerson] 发现 {disease_set}")
-        print(f"[Emerson] 发现 {len(disease_set)} 个 disease-associated clonotypes "
-              f"(p <= {self.p_value_threshold}).")
+        best_metric = -np.inf
+        best_p = None
+        best_model = None
+        best_disease_set = None
+        best_disease_df = None
+        best_val_score = None
+        best_val_ids = None
+        best_order_train = None
 
-        self.disease_sequence_set_ = disease_set
-        self.disease_sequences_df_ = disease_df
-
-        # --------- 构造 train (k,n) 特征并拟合 Beta-Binomial ---------
-        k_train, n_train, order_train = _build_emerson_features(train_clonotypes, disease_set)
-        y_train = np.array([train_labels[rep_id] for rep_id in order_train], dtype=int)
-
-        self.model = EmersonProbabilisticBinaryClassifier()
-        self.model.fit(k_train, n_train, y_train)
-
-        # --------- 在 val 子集上做一次评估（仅 dev 模式） ---------
-        if len(val_ids) > 0:
-            k_val, n_val, order_val = _build_emerson_features(val_clonotypes, disease_set)
-            y_val = np.array([val_labels[rep_id] for rep_id in order_val], dtype=int)
-
-            proba_val = self.model.predict_proba(k_val, n_val)
-            val_auc = roc_auc_score(y_val, proba_val)
-            val_bal_acc = balanced_accuracy_score(
-                y_val, (proba_val >= 0.5).astype(int)
+        for p_thr in self.p_value_thresholds:
+            print(f"[Emerson] finding clonotype, p_thr={p_thr}.")
+            # 1) 找 disease-associated clonotypes
+            disease_set, disease_df = _find_disease_associated_clonotypes(
+                train_clonotypes,
+                train_labels,
+                p_value_threshold=p_thr
             )
-            print(f"[Emerson] Validation AUC = {val_auc:.4f}, "
-                  f"balanced_accuracy = {val_bal_acc:.4f}")
 
-            self.val_score_ = {
-                'roc_auc': float(val_auc),
-                'balanced_accuracy': float(val_bal_acc)
-            }
-            self.val_ids_ = order_val
+            # 保存每个阈值对应的 disease_set / disease_df
+            self.disease_sequence_sets_by_p_[p_thr] = disease_set
+            self.disease_sequences_dfs_by_p_[p_thr] = disease_df
 
+            print(f"[Emerson] p_thr={p_thr} -> {len(disease_set)} disease-associated clonotypes.")
 
-            if self.log_dir is not None:
-                dataset_name = os.path.basename(os.path.normpath(train_dir_path))
-                os.makedirs(self.log_dir, exist_ok=True)
-                summary_path = os.path.join(self.log_dir, f"{dataset_name}_summary.txt")
-                with open(summary_path, "w") as f:
-                    f.write(f"[Emerson] Validation AUC = {val_auc:.4f}, ")
-                    f.write(f"balanced_accuracy = {val_bal_acc:.4f}")
-                print(f"[LOG] Validation summary written to `{summary_path}`")
+            # 2) 构造 train (k,n) 并拟合 Beta-Binomial
+            k_train, n_train, order_train = _build_emerson_features(train_clonotypes, disease_set)
+            y_train = np.array([train_labels[rep_id] for rep_id in order_train], dtype=int)
+
+            tmp_model = EmersonProbabilisticBinaryClassifier()
+            tmp_model.fit(k_train, n_train, y_train)
+
+            # 3) 若有 val，则评估并选最优（以 balanced_accuracy 为“验证准确率”）
+            if has_val:
+                k_val, n_val, order_val = _build_emerson_features(val_clonotypes, disease_set)
+                y_val = np.array([val_labels[rep_id] for rep_id in order_val], dtype=int)
+
+                proba_val = tmp_model.predict_proba(k_val, n_val)
+                val_auc = roc_auc_score(y_val, proba_val)
+                val_bal_acc = balanced_accuracy_score(y_val, (proba_val >= 0.5).astype(int))
+
+                score_dict = {'roc_auc': float(val_auc), 'balanced_accuracy': float(val_bal_acc)}
+                self.val_scores_by_p_[p_thr] = score_dict
+
+                print(f"[Emerson] p_thr={p_thr} | Validation AUC={val_auc:.4f}, "
+                    f"balanced_accuracy={val_bal_acc:.4f}")
+
+                # 以 balanced_accuracy 作为选择标准（“验证准确率最高”）
+                metric = val_auc
+                if metric > best_metric:
+                    best_metric = metric
+                    best_p = p_thr
+                    best_model = tmp_model
+                    best_disease_set = disease_set
+                    best_disease_df = disease_df
+                    best_val_score = score_dict
+                    best_val_ids = order_val
+                    best_order_train = order_train
+            else:
+                # full 模式无验证集：选第一个阈值（或你也可以改成别的策略）
+                if best_p is None:
+                    best_p = p_thr
+                    best_model = tmp_model
+                    best_disease_set = disease_set
+                    best_disease_df = disease_df
+                    best_val_score = None
+                    best_val_ids = []
+                    best_order_train = order_train
+
+        # --------- 写回最优结果到 self ---------
+        self.best_p_value_threshold_ = best_p
+        self.model = best_model
+        self.disease_sequence_set_ = best_disease_set
+        self.disease_sequences_df_ = best_disease_df
+        self.val_score_ = best_val_score
+        self.val_ids_ = best_val_ids
+        self.train_ids_ = best_order_train
+
+        if has_val:
+            print(f"[Emerson] Best p_thr={best_p} with balanced_accuracy={best_metric:.4f}")
         else:
-            # full 模式下不会划出验证集
-            self.val_score_ = None
-            self.val_ids_ = []
+            print(f"[Emerson] (full) Selected p_thr={best_p} (no validation split).")
 
-        self.train_ids_ = order_train
+        # --------- logging：额外写入 best_p ---------
+        if (self.log_dir is not None) and has_val:
+            dataset_name = os.path.basename(os.path.normpath(train_dir_path))
+            os.makedirs(self.log_dir, exist_ok=True)
+            summary_path = os.path.join(self.log_dir, f"{dataset_name}_summary.txt")
+            with open(summary_path, "w") as f:
+                f.write(f"[Emerson] Best p_value_threshold = {best_p}\n")
+                f.write(f"[Emerson] Validation AUC = {self.val_score_['roc_auc']:.4f}, ")
+                f.write(f"balanced_accuracy = {self.val_score_['balanced_accuracy']:.4f}\n")
+            print(f"[LOG] Validation summary written to `{summary_path}`")
 
         print("[Emerson] Training complete.")
         return self
+
 
     def predict_proba(self, test_dir_path: str) -> pd.DataFrame:
         """

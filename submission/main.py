@@ -91,7 +91,7 @@ def main_emerson(train_dir: str, test_dirs: List[str], out_dir: str, n_jobs: int
                     device=device,
                     log_dir='./logs',
                     mode='dev',
-                    p_value_threshold=0.0001,
+                    p_value_threshold=[0.01, 0.005, 0.001, 0.0001, 0.00001],
                     use_compairr=True, 
                     compairr_dir=os.path.join(out_dir, "compairr_inputs")
                 )
@@ -137,10 +137,10 @@ def run():
 
 
 if __name__ == "__main__":
-    run()
-    # main_emerson("/mnt/sda/Kaggle/AIRR-ML/train_datasets/train_datasets/train_dataset_1", 
-    #              ["/mnt/sda/Kaggle/AIRR-ML/test_datasets/test_datasets/test_dataset_1"], 
-    #              "./results", 16, 'cpu')
+    # run()
+    main_emerson("/mnt/sda/Kaggle/AIRR-ML/train_datasets/train_datasets/train_dataset_1", 
+                 ["/mnt/sda/Kaggle/AIRR-ML/test_datasets/test_datasets/test_dataset_1"], 
+                 "./results", 16, 'cpu')
     
     # main_kmer("/mnt/sda/Kaggle/AIRR-ML/train_datasets/train_datasets/train_dataset_2", 
     #             ["/mnt/sda/Kaggle/AIRR-ML/test_datasets/test_datasets/test_dataset_2"], 
